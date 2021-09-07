@@ -129,5 +129,9 @@ dmypy.json
 .pyre/
 
 
-# Svelte
+# Vue
 */node_modules/
+
+# Code Editors
+*/.idea
+*/.vscode

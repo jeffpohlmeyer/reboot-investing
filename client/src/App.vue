@@ -1,28 +1,36 @@
 <template>
-  <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png" />
-    <HelloWorld msg="Welcome to Your Vue.js App" />
+  <div class="h-screen">
+    <Chart :series="series" :symbol="symbol" :interval="interval" :volume="volume" />
+    <Selections @setData="setData" />
   </div>
 </template>
 
 <script>
-import HelloWorld from "./components/HelloWorld.vue";
+import { defineComponent, ref } from 'vue';
+import Selections from './components/Selections.vue';
+import Chart from './components/Chart.vue';
 
-export default {
-  name: "App",
+export default defineComponent({
   components: {
-    HelloWorld,
+    Selections,
+    Chart,
   },
-};
+  setup() {
+    const series = ref([]);
+    const symbol = ref('');
+    const interval = ref('Daily');
+    const volume = ref([])
+
+    const setData = (payload) => {
+      series.value = payload.series;
+      symbol.value = payload.symbol;
+      interval.value = payload.interval;
+      volume.value = payload.volume
+    };
+
+    return { setData, series, symbol, interval, volume };
+  },
+});
 </script>
 
-<style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
-}
-</style>
+<style></style>

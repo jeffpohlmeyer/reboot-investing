@@ -1,8 +1,7 @@
-import Vue from "vue";
+import { createApp } from "vue";
 import App from "./App.vue";
+import './index.css'
 
-Vue.config.productionTip = false;
+import VueApexCharts from 'vue3-apexcharts'
 
-new Vue({
-  render: (h) => h(App),
-}).$mount("#app");
+createApp(App).use(VueApexCharts).mount('#app')
