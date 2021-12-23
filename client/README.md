@@ -2197,6 +2197,7 @@ const postProcessData = (res) => {
 }
 ```
 
+### `handleSubmit` refactor
 This allows us to refactor `handleSubmit` to look like this
 ```javascript
 const handleSubmit = async () => {
@@ -2218,4 +2219,191 @@ We will now see that if we try clicking the button to get the chart that the loa
 ![](../../Desktop/Screen Shot 2021-12-23 at 3.50.05 PM.png)
 The problem that we'll run into in this situation, though, has to do with the loading spinner.
 Again, we run into the problem where if we didn't have the dev tools open then we would have received no feedback about this error.
-We need to somehow let the user know that something went wrong
+We need to somehow let the user know that something went wrong.
+## Error Dialog
+The first thing we're going to do is create a separate component and import it into our `Selections.vue` component.
+This component will use the [Dialog (Modal)](https://headlessui.dev/vue/dialog) component from Headless UI.
+The new component, called `JVPDialog.vue`, the bulk of which (not including the open/close states) comes from the [modal](https://tailwindui.com/components/application-ui/overlays/modals) section of [TailwindUI](https://tailwindui.com/).
+```vue
+<template>
+  <TransitionRoot as="template" :show="open">
+    <Dialog
+        as="div"
+        class="fixed z-10 inset-0 overflow-y-auto"
+        @close="closeDialog"
+    >
+      <div
+          class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0"
+      >
+        <TransitionChild
+            as="template"
+            enter="ease-out duration-300"
+            enter-from="opacity-0"
+            enter-to="opacity-100"
+            leave="ease-in duration-200"
+            leave-from="opacity-100"
+            leave-to="opacity-0"
+        >
+          <DialogOverlay
+              class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+          />
+        </TransitionChild>
+
+        <!-- This element is to trick the browser into centering the modal contents. -->
+        <span
+            class="hidden sm:inline-block sm:align-middle sm:h-screen"
+            aria-hidden="true"
+        >
+          &#8203;
+        </span>
+        <TransitionChild
+            as="template"
+            enter="ease-out duration-300"
+            enter-from="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            enter-to="opacity-100 translate-y-0 sm:scale-100"
+            leave="ease-in duration-200"
+            leave-from="opacity-100 translate-y-0 sm:scale-100"
+            leave-to="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        >
+          <div
+              class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+          >
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <div class="sm:flex sm:items-start">
+                <div
+                    class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10"
+                >
+                  <ExclamationIcon
+                      class="h-6 w-6 text-red-600"
+                      aria-hidden="true"
+                  />
+                </div>
+                <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                  <DialogTitle
+                      as="h3"
+                      class="text-lg leading-6 font-medium text-gray-900"
+                  >
+                    Not found
+                  </DialogTitle>
+                  <div class="mt-2">
+                    <p class="text-sm text-gray-500">
+                      There was an error fetching the data to populate that
+                      chart. Please try again
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+                class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse"
+            >
+              <button
+                  type="button"
+                  class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  @click="closeDialog"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </TransitionChild>
+      </div>
+    </Dialog>
+  </TransitionRoot>
+</template>
+
+<script>
+import { computed } from 'vue';
+import {
+  Dialog,
+  DialogOverlay,
+  DialogTitle,
+  TransitionChild,
+  TransitionRoot,
+} from '@headlessui/vue';
+import { ExclamationIcon } from '@heroicons/vue/outline';
+
+export default {
+  components: {
+    Dialog,
+    DialogOverlay,
+    DialogTitle,
+    TransitionChild,
+    TransitionRoot,
+    ExclamationIcon,
+  },
+  props: {
+    dialog: {
+      type: Boolean,
+      required: true,
+    },
+  },
+  emits: ['closeDialog'],
+  setup(props, { emit }) {
+    const open = computed(() => props.dialog);
+    const closeDialog = () => emit('closeDialog');
+
+    return {
+      open,
+      closeDialog,
+    };
+  },
+};
+</script>
+```
+We then add it to the beginning of `Selections.vue` like
+```html
+<template>
+  <div>
+    <JVPDialog :dialog="dialog" @closeDialog="closeDialog" />
+    <form class="ml-5" @submit.prevent="handleSubmit">
+      <div class="my-1">
+        <JVPInput
+          v-model="state.symbol"
+          label="Symbol"
+```
+where we've imported it and registered it as necessary, and added the following lines to the `script` section of the component
+```javascript
+const dialog = ref(false);
+
+const closeDialog = () => (dialog.value = false)
+```
+and also included these in the return statement of the `setup` function
+```javascript
+return {
+  intervals,
+  state,
+  disabled,
+  loading,
+  dialog,
+  v$,
+  handleSubmit,
+  closeDialog,
+};
+```
+For what it's worth, I know there is a lot going on in the `JVPDialog.vue` file and it would be worth it to discuss much of the functionality in depth, but I've never been good at CSS and I have found that paying for an account at TailwindUI has been more than worth it.
+You can play around with some of the classes in that component and see how things change and update.
+Also, it's worth noting that the modal I've used above is available as the free option on the main page, in case Adam Wathan ever reads this article.
+Now, all we need to do is add in a simple line in the `catch` block of `handleSubmit` that activates the dialog when an error is received.
+```javascript
+const handleSubmit = async () => {
+    v$.value.$validate();
+    if (!v$.value.$invalid) {
+        loading.value = true;
+        try {
+            const url = preProcessData();
+            const res = await fetchData(url);
+            postProcessData(res);
+        } catch (err) {
+            console.log('err', err);
+            dialog.value = true;
+        }
+        loading.value = false;
+    }
+};
+```
+and the resulting dialog that we see is displayed below.
+![](../../Desktop/Screen Shot 2021-12-23 at 4.51.15 PM.png)
+Before signing off, we need to make sure that we re-set the interval to be an actual valid value instead of the null value we set for these testing purposes.
+
+In the next article we'll discuss handling the actual returned data and passing it to another component for rendering the chart.
