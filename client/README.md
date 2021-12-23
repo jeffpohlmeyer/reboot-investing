@@ -2106,3 +2106,116 @@ Also, we needed to make the function itself `async` in order to utilize the `awa
 
 In the next article we'll discuss error handling, because having this type of functionality not wrapped in `try` and `catch` blocks is a recipe for disaster.
 We'll also add in a dialog to alert the user when an error has taken place.
+
+# Part 8
+As mentioned in the [last article](https://jeffpohlmeyer.com/candlestick-docker-fastapi-vue-part-7), we have functionality that enables us to fetch data from the FastAPI server we previously set up, but as of this moment we have nothing that will catch an error.
+The easiest way to demonstrate the problem with this is to first disable our client-side validation; the plan is to purposefully submit a request to the backend without an interval to see what happens when a bad request is sent.
+
+To do this we simply update the section in `Selections.vue` that converts the interval into what can be parsed by the backend to look like
+```javascript
+const interval = null
+  // state.interval === 'Daily'
+  //   ? '1d'
+  //   : state.interval === 'Weekly'
+  //     ? '1wk'
+  //     : '1mo';
+```
+If we do this and then try to submit a request to the backend with, for example, `MSFT` as the symbol, this is what the page will look like
+![](../../Desktop/Screen Shot 2021-12-23 at 2.13.49 PM.png)
+If we didn't have the dev tools open (as the vast majority of users don't) then we would have no idea what is going on as it would look like the request never completes.
+Thus, we need to add some sort of exception handling in this method.
+## Try/Catch
+There are _generally_ two ways to handle error handling in this project
+- `.then().catch().finally()` methodology
+- `async/await` methodology
+
+Since we're already using `async/await` in the current method we'll discuss that here.
+First, we don't need to wrap the entire `handleSubmit` method in a try/catch block.
+We're processing data in the first 40% of the method, and also in the last 40% of the method.
+The only place that we really _need_ to have the try/catch block is around the async function call.
+That said, it will make things a bit more organized if we can separate out some of the functionality.
+We will split the bulk of the code in `handleSubmit` into three separate methods: `preProcessData`, `fetchData`, `postProcessData`.
+This is unnecessary and may be overkill for smaller personal projects, but it will make it easier to keep track of everything.
+
+### Sub-methods
+The first is `preProcessData`:
+```javascript
+const preProcessData = () => {
+    // Create the querystring
+    const query = {}
+    if (!!state.startDate) query.start = state.startDate;
+    if (!!state.endDate) query.end = state.endDate;
+
+    const queryString = Object.keys(query)
+        .filter((key) => !!query[key])
+        .map((key) => {
+            return (
+                `${encodeURIComponent(key)}=${encodeURIComponent(query[key])}`
+            );
+        })
+        .join('&')
+
+    // Convert human-readable interval into yfinance style
+    const interval = null
+    // state.interval === 'Daily'
+    //   ? '1d'
+    //   : state.interval === 'Weekly'
+    //     ? '1wk'
+    //     : '1mo';
+
+    // Create URL string and add query if it exists
+    let url = `http://localhost:8000/quote/${state.symbol}/${interval}`;
+    if (queryString.length) url = `${url}?${queryString}`;
+    return url
+}
+```
+We will get the `url` from this method and pass it into `fetchData`
+```javascript
+const fetchData = async (url) => {
+    const response = await fetch(url);
+    return await response.json();
+}
+```
+Which will, in turn, return the `json` data that we get from the backend and pass it to `postProcessData`
+```javascript
+const postProcessData = (res) => {
+  // Parse dates
+  const formatDate = (d) => new Date(d).toISOString().substr(0, 10);
+  const dates = res.data.map((e) => e.date).sort();
+  state.startDate = formatDate(dates[0])
+  state.endDate = formatDate(dates[dates.length - 1])
+
+  // Format the data
+  const data = res.data.map((e) => ({
+    x: new Date(e.date),
+    y: e.data
+  }));
+  const volData = res.data.map((e) => ({
+    x: new Date(e.date),
+    y: e.volume ?? 0
+  }));
+}
+```
+
+This allows us to refactor `handleSubmit` to look like this
+```javascript
+const handleSubmit = async () => {
+  v$.value.$validate();
+  if (!v$.value.$invalid) {
+    loading.value = true;
+    try {
+      const url = preProcessData();
+      const res = await fetchData(url);
+      postProcessData(res);
+    } catch(err) {
+      console.log('err', err)
+    }
+    loading.value = false;
+  }
+};
+```
+We will now see that if we try clicking the button to get the chart that the loading spinner stops and we'll see a more descriptive error:
+![](../../Desktop/Screen Shot 2021-12-23 at 3.50.05 PM.png)
+The problem that we'll run into in this situation, though, has to do with the loading spinner.
+Again, we run into the problem where if we didn't have the dev tools open then we would have received no feedback about this error.
+We need to somehow let the user know that something went wrong

@@ -114,55 +114,69 @@ export default defineComponent({
 
     const loading = ref(false);
 
-    const handleSubmit = async () => {
-      v$.value.$validate();
-      if (!v$.value.$invalid) {
-        loading.value = true;
+    const preProcessData = () => {
+      // Create the querystring
+      const query = {}
+      if (!!state.startDate) query.start = state.startDate;
+      if (!!state.endDate) query.end = state.endDate;
 
-        // Create the querystring
-        const query = {}
-        if (!!state.startDate) query.start = state.startDate;
-        if (!!state.endDate) query.end = state.endDate;
-
-        const queryString = Object.keys(query)
+      const queryString = Object.keys(query)
           .filter((key) => !!query[key])
           .map((key) => {
             return (
-              `${encodeURIComponent(key)}=${encodeURIComponent(query[key])}`
+                `${encodeURIComponent(key)}=${encodeURIComponent(query[key])}`
             );
           })
           .join('&')
 
-        // Convert human-readable interval into yfinance style
-        const interval =
-          state.interval === 'Daily'
-            ? '1d'
-            : state.interval === 'Weekly'
-              ? '1wk'
-              : '1mo';
+      // Convert human-readable interval into yfinance style
+      const interval = null
+      // state.interval === 'Daily'
+      //   ? '1d'
+      //   : state.interval === 'Weekly'
+      //     ? '1wk'
+      //     : '1mo';
 
-        // Create URL string and add query if it exists
-        let url = `http://localhost:8000/quote/${state.symbol}/${interval}`;
-        if (queryString.length) url = `${url}?${queryString}`;
-        const response = await fetch(url);
-        const res = await response.json();
+      // Create URL string and add query if it exists
+      let url = `http://localhost:8000/quote/${state.symbol}/${interval}`;
+      if (queryString.length) url = `${url}?${queryString}`;
+      return url
+    }
 
-        // Parse dates
-        const formatDate = (d) => new Date(d).toISOString().substr(0, 10);
-        const dates = res.data.map((e) => e.date).sort();
-        state.startDate = formatDate(dates[0])
-        state.endDate = formatDate(dates[dates.length - 1])
+    const fetchData = async (url) => {
+      const response = await fetch(url);
+      return await response.json();
+    }
 
-        // Format the data
-        const data = res.data.map((e) => ({
-          x: new Date(e.date),
-          y: e.data
-        }));
-        const volData = res.data.map((e) => ({
-          x: new Date(e.date),
-          y: e.volume ?? 0
-        }));
+    const postProcessData = (res) => {
+      // Parse dates
+      const formatDate = (d) => new Date(d).toISOString().substr(0, 10);
+      const dates = res.data.map((e) => e.date).sort();
+      state.startDate = formatDate(dates[0])
+      state.endDate = formatDate(dates[dates.length - 1])
 
+      // Format the data
+      const data = res.data.map((e) => ({
+        x: new Date(e.date),
+        y: e.data
+      }));
+      const volData = res.data.map((e) => ({
+        x: new Date(e.date),
+        y: e.volume ?? 0
+      }));
+    }
+
+    const handleSubmit = async () => {
+      v$.value.$validate();
+      if (!v$.value.$invalid) {
+        loading.value = true;
+        try {
+          const url = preProcessData();
+          const res = await fetchData(url);
+          postProcessData(res);
+        } catch(err) {
+          console.log('err', err)
+        }
         loading.value = false;
       }
     };
