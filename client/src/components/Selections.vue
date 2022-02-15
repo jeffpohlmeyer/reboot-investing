@@ -70,7 +70,8 @@ import JVPDialog from './JVPDialog.vue';
 
 export default defineComponent({
   components: { JVPDialog, JVPInput, JVPSelect },
-  setup() {
+  emits: ['setData'],
+  setup(_, { emit }) {
     const intervals = ['Daily', 'Weekly', 'Monthly'];
 
     const state = reactive({
@@ -157,19 +158,29 @@ export default defineComponent({
     const postProcessData = (res) => {
       // Parse dates
       const formatDate = (d) => new Date(d).toISOString().substr(0, 10);
-      const dates = res.data.map((e) => e.date).sort();
-      state.startDate = formatDate(dates[0]);
-      state.endDate = formatDate(dates[dates.length - 1]);
+      const dates = res.map((e) => e.date).sort();
+      if (!state.startDate) {
+        state.startDate = formatDate(dates[0]);
+      }
+      if (!state.endDate) {
+        state.endDate = formatDate(dates[dates.length - 1]);
+      }
 
       // Format the data
-      const data = res.data.map((e) => ({
+      const data = res.map((e) => ({
         x: new Date(e.date),
         y: e.data,
       }));
-      const volData = res.data.map((e) => ({
+      const volData = res.map((e) => ({
         x: new Date(e.date),
         y: e.volume ?? 0,
       }));
+      return {
+        series: [{ data }],
+        symbol: state.symbol,
+        interval: state.interval,
+        volume: [{ name: 'volume', data: volData }],
+      };
     };
 
     const handleSubmit = async () => {
@@ -179,7 +190,9 @@ export default defineComponent({
         try {
           const url = preProcessData();
           const res = await fetchData(url);
-          postProcessData(res);
+          const payload = postProcessData(res);
+
+          emit('setData', payload);
         } catch (err) {
           console.log('err', err);
           dialog.value = true;

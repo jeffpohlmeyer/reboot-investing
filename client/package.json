@@ -9,7 +9,9 @@
   "dependencies": {
     "@vuelidate/core": "^2.0.0-alpha.32",
     "@vuelidate/validators": "^2.0.0-alpha.25",
-    "vue": "^3.2.16"
+    "apexcharts": "^3.33.1",
+    "vue": "^3.2.16",
+    "vue3-apexcharts": "^1.4.1"
   },
   "devDependencies": {
     "@headlessui/vue": "^1.4.2",
