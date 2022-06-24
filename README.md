@@ -1,4 +1,6 @@
 # Reboot Investing
+https://rebootinvesting.com/
+
 Simple repo that generates candlestick charts using a free public API
 
 ## Instructions
